@@ -31,6 +31,28 @@
 .syncform input:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
 .syncform .btn{margin-top:4px}
 .toast{margin:0;font-size:13.5px;font-weight:600;color:var(--blue-ink);background:var(--sky);padding:10px 12px;border-radius:10px}
+.cal-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cal-nav{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px}
+.cal-nav .tbtn{font-size:18px;line-height:1}
+.cal-nav .tbtn[disabled]{opacity:.3;cursor:default}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px 0;text-align:center}
+.cw{font-size:11.5px;font-weight:600;color:var(--faint);padding-bottom:2px}
+.cd{all:unset;box-sizing:border-box;justify-self:center;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:500;color:var(--ink)}
+.cd.future{color:var(--faint)}
+.cd.today{box-shadow:inset 0 0 0 1.5px var(--blue);color:var(--blue-ink);font-weight:700}
+.cd.on{background:var(--blue);color:#fff;font-weight:700;cursor:pointer}
+.cd.on.today{box-shadow:inset 0 0 0 2px var(--navy)}
+.cd.sel{box-shadow:0 0 0 3px var(--marker)}
+.cal-sum{margin:0;font-size:14px;color:var(--muted)}
+.cal-sum b{color:var(--ink)}
+.cal-detail{display:flex;flex-direction:column;gap:6px;background:var(--bg);border-radius:12px;padding:12px 14px}
+.cal-row{display:flex;align-items:center;gap:10px;font-size:14px}
+.cal-row .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.cal-row .dot.ok{background:var(--blue)} .cal-row .dot.no{background:var(--red)}
+.cal-res{margin-left:auto;font-size:13px;color:var(--muted);font-weight:600}
+.stat.link{all:unset;box-sizing:border-box;cursor:pointer;background:var(--navy);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:2px}
+.stat.link b,.stat.link span{color:var(--on-navy)}
+.remain{margin:0;font-size:12px;color:var(--faint);text-align:center}
 </style>
 </head>
 <body>
@@ -503,7 +525,8 @@ function renderStats(){
   const recs=Object.entries(S.prog.answers).filter(([id])=>byId(id));
   const total=recs.length, ok=recs.filter(([,r])=>r.ok).length;
   let h=`<section class="lede"><h1>기록</h1><p>첫 시도 기준 정답률이에요. 오답노트에서 다시 맞힌 건 따로 반영하지 않아요.</p></section>
-  <div class="stats"><div class="stat"><b>${streak()}</b><span>연속 학습일</span></div><div class="stat"><b>${total}</b><span>푼 문제</span></div><div class="stat"><b>${total?Math.round(ok/total*100):0}%</b><span>정답률</span></div></div>`;
+  <div class="stats"><button class="stat link" data-gocal><b>${streak()}</b><span>연속 학습일</span></button><div class="stat"><b>${total}</b><span>푼 문제</span></div><div class="stat"><b>${total?Math.round(ok/total*100):0}%</b><span>정답률</span></div></div>`;
+  h+=calendarCard();
   const barRow=(label,sub,list)=>{const c=list.filter(([,x])=>x.ok).length,p=list.length?Math.round(c/list.length*100):0;return `<div class="bar"><span>${label} <span style="color:var(--faint);font-size:13px">${sub}</span></span><span class="n">${list.length?`${c}/${list.length} · ${p}%`:"—"}</span><div class="track"><div class="fillbar" style="width:${p}%"></div></div></div>`};
   h+=`<section class="card"><p class="label">섹션별</p><div class="bars">${["CR","RC","DI","Q"].map(k=>barRow(SECTIONS[k].kr,SECTIONS[k].en,recs.filter(([id])=>byId(id).section===k))).join("")}</div></section>`;
   h+=`<section class="card"><p class="label">난이도별</p><div class="bars">${[1,2,3].map(l=>barRow(LEVEL[l],"",recs.filter(([id])=>(byId(id).difficulty||1)===l))).join("")}</div></section>`;
@@ -511,8 +534,9 @@ function renderStats(){
   recs.forEach(([id,r])=>{const q=byId(id),k=q.section+" · "+q.type;(types[k]=types[k]||{n:0,c:0}).n++;if(r.ok)types[k].c++;});
   const tl=Object.entries(types).sort((a,b)=>a[1].c/a[1].n-b[1].c/b[1].n);
   if(tl.length) h+=`<section class="card"><p class="label">유형별</p><table class="types">${tl.map(([k,v])=>`<tr class="${v.n>=2&&v.c/v.n<.5?"weak":""}"><td>${esc(k)}</td><td>${v.c}/${v.n}</td></tr>`).join("")}</table></section>`;
-  h+=`<section class="card"><p class="label">남은 새 문제</p><div class="bars">${["CR","RC","DI","Q"].map(k=>`<div class="bar"><span>${SECTIONS[k].kr}</span><span class="n">${unanswered(k).length}개</span></div>`).join("")}</div></section>`;
+
   h+=backupCard();
+  h+=`<p class="remain">남은 새 문제 · ${["CR","RC","DI","Q"].map(k=>`${SECTIONS[k].kr} ${unanswered(k).length}`).join(" · ")}</p>`;
   view.innerHTML=h;
 }
 
@@ -574,6 +598,9 @@ view.addEventListener("click",e=>{
   if(t.hasAttribute("data-restore")){document.getElementById("restoreFile").click();return}
   if(t.hasAttribute("data-sync-now")){SYNC.sha=null;syncNow();return}
   if(t.hasAttribute("data-sync-off")){SYNC.cfg=null;try{localStorage.removeItem(SYNC_KEY)}catch{};render();return}
+  if(t.hasAttribute("data-gocal")){const c=document.getElementById("cal");if(c)c.scrollIntoView({behavior:"smooth",block:"start"});return}
+  if(t.dataset.cal){shiftMonth(+t.dataset.cal);rerenderKeepScroll();return}
+  if(t.dataset.day){S.calDay=S.calDay===t.dataset.day?null:t.dataset.day;rerenderKeepScroll();return}
   if(t.dataset.submit){
     const id=t.dataset.submit,q=byId(id),c=curValue(id); if(!complete(q,c)) return;
     pauseClock(id); const okv=sameAns(c,q.answer), secs=elapsedSec(id);
@@ -602,7 +629,16 @@ function mergeProg(a,b){
     else out.answers[id]={...(x.at<=r.at?x:r),fixed:!!(x.fixed||r.fixed)};   // keep the first attempt, keep any later fix
   }
   for(const src of [a.days||{},b.days||{}]) for(const [d,ids] of Object.entries(src)){out.days[d]=Array.from(new Set([...(out.days[d]||[]),...ids]))}
+  const ra=Math.max(+a.resetAt||0,+b.resetAt||0); if(ra) out.resetAt=ra;
   return out;
+}
+const RESET_KEY="gmat-daily-reset-v1";
+// A record file with a newer resetAt than this device has seen replaces local records instead of merging, so a reset is not undone by old local data.
+function takeRemote(remote){
+  let seen=0;try{seen=+(localStorage.getItem(RESET_KEY)||0)}catch{}
+  if(remote.resetAt&&+remote.resetAt>seen){S.prog={answers:remote.answers||{},days:remote.days||{},resetAt:+remote.resetAt};try{localStorage.setItem(RESET_KEY,String(remote.resetAt))}catch{}}
+  else S.prog=mergeProg(remote,S.prog);
+  saveLocal();
 }
 function ghHeaders(){return {"Authorization":"Bearer "+SYNC.cfg.token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}}
 const ghUrl=()=>`https://api.github.com/repos/${SYNC.cfg.repo}/contents/${SYNC.cfg.path||"progress.json"}`;
@@ -615,7 +651,7 @@ async function syncPull(){
 async function syncPush(retry){
   const body={message:"progress "+todayKST(),content:b64e(JSON.stringify(S.prog,null,1)),...(SYNC.sha?{sha:SYNC.sha}:{})};
   const r=await fetch(ghUrl(),{method:"PUT",headers:{...ghHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)});
-  if((r.status===409||r.status===422)&&!retry){const remote=await syncPull();if(remote){S.prog=mergeProg(remote,S.prog);saveLocal()}return syncPush(true)}
+  if((r.status===409||r.status===422)&&!retry){const remote=await syncPull();if(remote)takeRemote(remote);return syncPush(true)}
   if(!r.ok) throw new Error(r.status===401?"토큰이 맞지 않거나 만료됐어요":r.status===403||r.status===404?"토큰에 이 저장소 쓰기 권한이 없어요":"GitHub 응답 오류 ("+r.status+")");
   const j=await r.json(); SYNC.sha=j.content.sha;
 }
@@ -626,7 +662,7 @@ async function syncNow(){
   if(SYNC.busy){SYNC.again=true;return}
   SYNC.busy=true; setSync("busy");
   try{
-    if(SYNC.sha===null){const remote=await syncPull();if(remote){S.prog=mergeProg(remote,S.prog);saveLocal()}}
+    if(SYNC.sha===null){const remote=await syncPull();if(remote)takeRemote(remote)}
     await syncPush(false); setSync("ok");
   }catch(e){setSync("err",e.message||"저장하지 못했어요. 인터넷 연결을 확인해 주세요")}
   SYNC.busy=false;
@@ -636,7 +672,7 @@ function scheduleSync(){if(!SYNC.cfg)return;clearTimeout(SYNC.timer);SYNC.timer=
 async function syncOnBoot(){
   if(!SYNC.cfg) return;
   setSync("busy");
-  try{const remote=await syncPull();if(remote){S.prog=mergeProg(remote,S.prog);saveLocal();render()}await syncPush(false);setSync("ok")}
+  try{const remote=await syncPull();if(remote){takeRemote(remote);render()}await syncPush(false);setSync("ok")}
   catch(e){setSync("err",e.message||"불러오지 못했어요")}
 }
 function syncStatusHTML(){
@@ -684,6 +720,35 @@ document.addEventListener("submit",async e=>{
   if(SYNC.state==="err"){const m=SYNC.msg;SYNC.cfg=null;try{localStorage.removeItem(SYNC_KEY)}catch{};render();alertBox("연결하지 못했어요: "+m)}
 });
 function alertBox(msg){const el=document.getElementById("backup");if(!el)return;let n=el.querySelector(".toast");if(!n){n=document.createElement("p");n.className="toast";el.appendChild(n)}n.textContent=msg}
+/* ---------- study calendar ---------- */
+function monthKey(d){return d.slice(0,7)}
+function calendarCard(){
+  const today=todayKST();
+  const mk=S.calMonth||monthKey(today);
+  const [y,m]=mk.split("-").map(Number);
+  const first=new Date(Date.UTC(y,m-1,1)), days=new Date(Date.UTC(y,m,0)).getUTCDate(), lead=first.getUTCDay();
+  const studied=d=>(S.prog.days[d]||[]).filter(byId).length;
+  let cells="";
+  for(let i=0;i<lead;i++) cells+=`<span class="cd empty"></span>`;
+  let count=0;
+  for(let dd=1;dd<=days;dd++){
+    const d=`${mk}-${String(dd).padStart(2,"0")}`, n=studied(d);
+    if(n) count++;
+    const cls=["cd",n?"on":"",d===today?"today":"",S.calDay===d?"sel":"",d>today?"future":""].join(" ");
+    cells+=n?`<button class="${cls}" data-day="${d}" aria-label="${m}월 ${dd}일 ${n}문제">${dd}</button>`:`<span class="${cls}">${dd}</span>`;
+  }
+  const minMonth=Object.keys(S.prog.days).sort()[0];
+  const canPrev=minMonth?monthKey(minMonth)<mk:false, canNext=mk<monthKey(today);
+  let detail="";
+  if(S.calDay&&monthKey(S.calDay)===mk){
+    const ids=(S.prog.days[S.calDay]||[]).filter(byId);
+    detail=`<div class="cal-detail"><p class="label">${+S.calDay.slice(5,7)}월 ${+S.calDay.slice(8,10)}일 · ${ids.length}문제</p>${ids.map(id=>{const q=byId(id),r=S.prog.answers[id];return `<div class="cal-row"><span class="dot ${r&&r.ok?"ok":"no"}"></span><span>${esc(q.section)} · ${esc(q.type)}</span><span class="cal-res">${r&&r.ok?"정답":"오답"}</span></div>`}).join("")}</div>`;
+  }
+  return `<section class="card" id="cal"><div class="cal-head"><p class="label">학습 달력</p><div class="cal-nav"><button class="tbtn" data-cal="-1" aria-label="이전 달" ${canPrev?"":"disabled"}>‹</button><span>${y}년 ${m}월</span><button class="tbtn" data-cal="1" aria-label="다음 달" ${canNext?"":"disabled"}>›</button></div></div>
+  <div class="cal-grid">${["일","월","화","수","목","금","토"].map(w=>`<span class="cw">${w}</span>`).join("")}${cells}</div>
+  <p class="cal-sum">${count?`이번 달 <b>${count}일</b> 공부했어요`:"이번 달 아직 푼 날이 없어요"}</p>${detail}</section>`;
+}
+function shiftMonth(delta){const mk=S.calMonth||monthKey(todayKST());const [y,m]=mk.split("-").map(Number);const d=new Date(Date.UTC(y,m-1+delta,1));S.calMonth=d.toISOString().slice(0,7);S.calDay=null}
 function rerenderKeepScroll(){const y=window.scrollY;render();window.scrollTo(0,y)}
 
 /* ---------- boot ---------- */
