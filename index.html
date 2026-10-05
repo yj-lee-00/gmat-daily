@@ -729,7 +729,7 @@ function calendarCard(){
   const first=new Date(Date.UTC(y,m-1,1)), days=new Date(Date.UTC(y,m,0)).getUTCDate(), lead=first.getUTCDay();
   const studied=d=>(S.prog.days[d]||[]).filter(byId).length;
   let cells="";
-  for(let i=0;i<lead;i++) cells+=`<span class="cd empty"></span>`;
+  for(let i=0;i<lead;i++) cells+=`<span class="cd blank"></span>`;
   let count=0;
   for(let dd=1;dd<=days;dd++){
     const d=`${mk}-${String(dd).padStart(2,"0")}`, n=studied(d);
